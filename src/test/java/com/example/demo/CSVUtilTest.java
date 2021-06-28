@@ -65,4 +65,61 @@ public class CSVUtilTest {
 
 
 
+    @Test
+    void reactive_filtrarJugadoresMayoresA34porClubEspecifico(){
+        List<Player> list = CsvUtilFile.getPlayers();
+        Flux<Player> listFlux = Flux.fromStream(list.parallelStream()).cache();
+        Mono<Map<String, Collection<Player>>> listFilter = listFlux
+                .filter(player -> player.age>34)
+                .filter(player -> player.club.equals("JL TEAM"))
+                .distinct()
+                .collectMultimap(Player::getClub);
+
+        System.out.println(listFilter.block().size());
+        listFilter.block().forEach((s, players) -> {
+            System.out.println("El equipo: "+s);
+            players.forEach(player -> {
+                System.out.println("Jugador : "+player.name +" tiene "+ player.age+" años");
+                assert player.age > 34;
+            });
+            assert s.equals("JL TEAM");
+            assert players.size() == 4;
+        });
+    }
+
+   /* @Test
+    void reactive_filtrarPorNacionalidadOrdenadosPorVictorias(){
+        List<Player> list = CsvUtilFile.getPlayers();
+        Flux<Player> listFlux = Flux.fromStream(list.parallelStream()).cache();
+        Mono<Map<String, Collection<Player>>> listFilter = listFlux
+                .sort((s, player) -> player.winners)
+                .distinct()
+                .collectMultimap(Player::getNational);
+
+        assert listFilter.block().size() == 164;
+    }*/
+
+    @Test
+    void reactive_filterNacionalityRankingWinners() {
+        List<Player> list = CsvUtilFile.getPlayers();
+        Flux<Player> listFlux = Flux.fromStream(list.parallelStream()).cache();
+        Mono<Map<String, Collection<Player>>> listFilter = listFlux
+                .buffer(100)
+                .flatMap(playerA -> listFlux
+                        .filter(playerB -> playerA.stream()
+                                .anyMatch(a -> a.national.equals(playerB.national)))
+                ).distinct()
+                .sort((k, player) -> player.winners)
+                .collectMultimap(Player::getNational);
+
+        System.out.println("Por Nacionalidad: ");
+        System.out.println(listFilter.block().size());
+        listFilter.block().forEach((k, players) -> {
+            System.out.println("Pais: " + k);
+            players.forEach(player -> {
+                System.out.println(player.name + " victorias: " + player.winners);
+            });
+        });
+    }
+
 }
